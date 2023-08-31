@@ -390,6 +390,7 @@ private:
     void EnableAtmosphere(wxCommandEvent& event);
     void EnableRotation(wxCommandEvent& event);
     void CreatePlanet(wxCommandEvent& event);
+    void EnableDistance(wxCommandEvent& event);
     wxDECLARE_EVENT_TABLE();
 private:
 
@@ -464,6 +465,7 @@ wxBEGIN_EVENT_TABLE(frame, wxFrame)
   EVT_CHECKBOX(ID_HeatSource, frame::EnableTemperature)
   EVT_CHECKBOX(ID_Atmosphere, frame::EnableAtmosphere)
   EVT_CHECKBOX(ID_IsRotating, frame::EnableRotation)
+  EVT_LISTBOX(ID_SelectPlanetsCM, frame::EnableDistance)
 wxEND_EVENT_TABLE()
 
 // Implement app
@@ -543,6 +545,7 @@ frame::frame(const wxString& title, const wxPoint& pos, const wxSize& size) : wx
     select_distance = new wxStaticText(panel,wxID_ANY,"Distance: ",wxPoint(170,150));
     distance_value = new wxTextCtrl(panel,ID_Distance,"",wxPoint(240,140),wxSize(100,35));
     distance_units = new wxChoice(panel,ID_DistanceUnits,wxPoint(350,140),wxSize(100,-1),lengthUnits);
+    distance_value->Enable(false);
     distance_units->Select(3);
     // Temperature
     select_temperature = new wxStaticText(panel,wxID_ANY,"Temperature [K]: ",wxPoint(10,340));
@@ -576,11 +579,26 @@ frame::frame(const wxString& title, const wxPoint& pos, const wxSize& size) : wx
 
 }
 
+void frame::EnableDistance(wxCommandEvent& event){
+  std::vector<std::string> pivots;
+  wxArrayInt planetSelections;
+  select_planet_cm->GetSelections(planetSelections);
+  for (auto& elem: planetSelections) pivots.push_back( std::string(bodyNames[elem].mb_str()) );
+  if (pivots.size()==0){
+    distance_value->Enable(false);
+    distance_value->ChangeValue("");
+  }else{
+    distance_value->Enable(true);
+  }
+
+}
+
 void frame::EnableTemperature(wxCommandEvent& event){
   if(select_heat_source->IsChecked()){
     temperature_value->Enable(true);
   }else{
     temperature_value->Enable(false);
+    temperature_value->ChangeValue("");
   }
 }
 
@@ -589,6 +607,7 @@ void frame::EnableAtmosphere(wxCommandEvent& event){
     albedo_value->Enable(true);
   }else{
     albedo_value->Enable(false);
+    albedo_value->ChangeValue("");
   }
 }
 
@@ -597,6 +616,7 @@ void frame::EnableRotation(wxCommandEvent& event){
     period_value->Enable(true);
   }else{
     period_value->Enable(false);
+    period_value->ChangeValue("");
   }
 }
 
@@ -660,18 +680,6 @@ void frame::CreatePlanet(wxCommandEvent& event){
   for (auto& elem : starSystem.getBodies()) if (planetName==elem.getName()) valid = false;
   if (planetName == "") valid = false;
   std::cout << "PLANET NAME IS " << planetName << "\n";
-
-  // body distance
-  double distance;
-  std::string distanceString = std::string(distance_value->GetLineText(0).mb_str());
-  if (distanceString=="") valid = false;
-  else{
-    analysis << distanceString;
-    analysis >> distance;
-    analysis.clear();
-  }
-  distance *= lengthSI(distance_units->GetSelection());
-  std::cout << "DISTANCE IS " << distance << "\n";
 
   // mass
   double mass;
@@ -738,6 +746,20 @@ void frame::CreatePlanet(wxCommandEvent& event){
   for (auto& elem: planetSelections) pivots.push_back( std::string(bodyNames[elem].mb_str()) );
   std::cout << "PIVOTS: "; for (auto& elem: pivots) std::cout << elem << " "; std::cout << "\n";
 
+  // body distance
+  double distance = 0;
+  if (pivots.size()!=0){
+    std::string distanceString = std::string(distance_value->GetLineText(0).mb_str());
+    if (distanceString=="") valid = false;
+    else{
+      analysis << distanceString;
+      analysis >> distance;
+      analysis.clear();
+    }
+    distance *= lengthSI(distance_units->GetSelection());
+  }
+  std::cout << "DISTANCE IS " << distance << "\n";
+
   // Validate and add body
   if (valid){
     starSystem.linkBody(mass,radius,distance,pivots,angularVelocity,planetName,temperature,isHeatSource,0,inverted,0);
@@ -746,6 +768,25 @@ void frame::CreatePlanet(wxCommandEvent& event){
     delete select_planet_cm;
     select_planet = new wxListBox(panel,ID_SelectPlanet,wxPoint(460,140),wxSize(250,100),bodyNames,wxLB_MULTIPLE);
     select_planet_cm = new wxListBox(panel,ID_SelectPlanetsCM,wxPoint(10,140),wxSize(150,100),bodyNames,wxLB_MULTIPLE);
+
+    distance_value->Enable(false);
+    temperature_value->Enable(false);
+    albedo_value->Enable(false);
+    period_value->Enable(false);
+
+    select_atmosphere->SetValue(false);
+    select_heat_source->SetValue(false);
+    select_inverted_orbit->SetValue(false);
+    select_rotation->SetValue(false);
+
+    period_value->ChangeValue("");
+    distance_value->ChangeValue("");
+    temperature_value->ChangeValue("");
+    albedo_value->ChangeValue("");
+    mass_value->ChangeValue("");
+    radius_value->ChangeValue("");
+    name_value->ChangeValue("");
+
   }else{
     wxMessageBox( "Something went wrong during the insertion of parameters. Check that the numbers are in a correct format, and that the name of the body is not repeated or an empty string.", "ERROR", wxOK | wxICON_INFORMATION );
   }
