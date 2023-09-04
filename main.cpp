@@ -1,6 +1,7 @@
 // wxwidgets
 #include <wx/wx.h>
 #include <wx/spinctrl.h>
+#include <wx/wfstream.h>
 
 // C++ libs
 #include <iostream>
@@ -101,7 +102,9 @@ enum
     ID_RadiusUnits = 23,
     ID_Period = 24,
     ID_PeriodUnits = 25,
-    ID_IsRotating = 26
+    ID_IsRotating = 26,
+    ID_Save = 27,
+    ID_Load = 28
 
 };
 
@@ -186,7 +189,26 @@ public:
     ~sys() = default;
 
     std::vector<body> getBodies(){
-      return bodies;
+      return originalBodies;
+    }
+
+    body operator[](const int& i){return originalBodies[i];}
+
+    int size () {return originalBodies.size();}
+
+    void deleteBody(std::string name){
+      std::vector<body> newBodies;
+      for (int i = 0; i < originalBodies.size(); i++){
+        if (originalBodies[i].getName() != name){
+          newBodies.push_back(originalBodies[i]);
+        }
+      }
+      originalBodies = newBodies;
+    }
+
+    void linkBody (body b){
+      std::cout << "Linked body " << b.getName() << "\n";
+      originalBodies.push_back(b);
     }
 
     // Adds a body to the planetary system
@@ -196,7 +218,7 @@ public:
         vec2 centerOfMassPos(0,0);
         vec2 centerOfMassVel(0,0);
         double massSum = 0;
-        for (auto& a : bodies ) for (auto& b : pivots) if (a.getName() == b) {
+        for (auto& a : originalBodies ) for (auto& b : pivots) if (a.getName() == b) {
           centerOfMassPos = centerOfMassPos + a.getPosition()*a.getMass();
           centerOfMassVel = centerOfMassVel + a.getVelocity()*a.getMass();
           massSum += a.getMass();
@@ -214,8 +236,7 @@ public:
         if (inverted) vel = vel - speed*vec2(-sin(orbitalAngle),cos(orbitalAngle));
         else vel = vel + speed*vec2(-sin(orbitalAngle),cos(orbitalAngle));
         // Create Body
-        bodies.push_back( body(mass, radius, pos, vel, vec2(), angularVelocity, name, temperature, heatSource, dayAngle) );
-        originalBodies.push_back(bodies.back());
+        originalBodies.push_back( body(mass, radius, pos, vel, vec2(), angularVelocity, name, temperature, heatSource, dayAngle) );
 
         std::cout << "Created new body: pos(" << pos.X() << " , " << pos.Y() << "), vel(" << vel.X() << " , " << vel.Y() << ")\n";
     }
@@ -390,7 +411,10 @@ private:
     void EnableAtmosphere(wxCommandEvent& event);
     void EnableRotation(wxCommandEvent& event);
     void CreatePlanet(wxCommandEvent& event);
+    void DeletePlanet(wxCommandEvent& event);
     void EnableDistance(wxCommandEvent& event);
+    void Save(wxCommandEvent& event);
+    void Load(wxCommandEvent& event);
     wxDECLARE_EVENT_TABLE();
 private:
 
@@ -460,8 +484,11 @@ wxBEGIN_EVENT_TABLE(frame, wxFrame)
   EVT_MENU(ID_Test,    frame::OnHello)
   EVT_MENU(wxID_EXIT,  frame::OnExit)
   EVT_MENU(wxID_ABOUT, frame::OnAbout)
+  EVT_MENU(ID_Save, frame::Save)
+  EVT_MENU(ID_Load, frame::Load)
   EVT_BUTTON(ID_Run, frame::OnRun)
   EVT_BUTTON(ID_CreatePlanet, frame::CreatePlanet)
+  EVT_BUTTON(ID_DeletePlanet, frame::DeletePlanet)
   EVT_CHECKBOX(ID_HeatSource, frame::EnableTemperature)
   EVT_CHECKBOX(ID_Atmosphere, frame::EnableAtmosphere)
   EVT_CHECKBOX(ID_IsRotating, frame::EnableRotation)
@@ -484,7 +511,8 @@ frame::frame(const wxString& title, const wxPoint& pos, const wxSize& size) : wx
 
     // File tab
     wxMenu *menuFile = new wxMenu;
-    menuFile->Append(ID_Test, "&Hello\tCtrl-H", "Hello there :)");
+    menuFile->Append(ID_Save, "&Save\tCtrl-S", "Save this star system");
+    menuFile->Append(ID_Load, "&Load\tCtrl-L", "Load a star system");
     menuFile->AppendSeparator();
     menuFile->Append(wxID_EXIT);
 
@@ -669,6 +697,20 @@ void frame::OnRun(wxCommandEvent& event){
 
 }
 
+void frame::DeletePlanet(wxCommandEvent& event){
+  wxArrayInt planetSelections;
+  select_planet->GetSelections(planetSelections);
+  for (auto& elem: planetSelections) {
+    std::string remove = std::string(bodyNames[elem].mb_str());
+    starSystem.deleteBody( remove );
+    bodyNames.Remove( remove );
+  }
+  delete select_planet;
+  delete select_planet_cm;
+  select_planet = new wxListBox(panel,ID_SelectPlanet,wxPoint(460,140),wxSize(250,100),bodyNames,wxLB_MULTIPLE);
+  select_planet_cm = new wxListBox(panel,ID_SelectPlanetsCM,wxPoint(10,140),wxSize(150,100),bodyNames,wxLB_MULTIPLE);
+}
+
 void frame::CreatePlanet(wxCommandEvent& event){
 
   // needed variable
@@ -790,5 +832,79 @@ void frame::CreatePlanet(wxCommandEvent& event){
   }else{
     wxMessageBox( "Something went wrong during the insertion of parameters. Check that the numbers are in a correct format, and that the name of the body is not repeated or an empty string.", "ERROR", wxOK | wxICON_INFORMATION );
   }
+}
 
+void frame::Save(wxCommandEvent& event){
+
+  wxFileDialog saveFileDialog(this, _("Save SYS file"), "", "", "SYS files (*.sys)|*.sys", wxFD_SAVE|wxFD_OVERWRITE_PROMPT);
+  if (saveFileDialog.ShowModal() == wxID_CANCEL) return;
+  std::string path = std::string(saveFileDialog.GetPath().mb_str());
+  std::cout << "Saving file " << path << "\n";
+  std::ofstream output;
+  output.open(path);
+  std::cout << "File status: " << output.is_open() << "\n";
+
+  for (int i = 0; i < starSystem.size(); i++){
+    std::cout << "saving " << starSystem[i].getName()  <<"\n";
+    output << "( NAME " << starSystem[i].getName() << " MASS " << starSystem[i].getMass()
+    << " RADIUS " << starSystem[i].getRadius() << " TEMP " << starSystem[i].getTemperature()
+    << " ANGLE " << starSystem[i].getAngle() << " ANGVEL " << starSystem[i].getAngularVelocity()
+    << " POS " << starSystem[i].getPosition().X() << " " << starSystem[i].getPosition().Y()
+    << " VEL " << starSystem[i].getVelocity().X() << " " << starSystem[i].getVelocity().Y()
+    << " ACC " << starSystem[i].getAcceleration().X() << " " << starSystem[i].getAcceleration().Y()
+    << " HEATSRC " << starSystem[i].getIsHeatSource() << " )"
+    << "\n";
+  }
+  output.close();
+}
+
+void frame::Load(wxCommandEvent& event){
+
+  starSystem = sys();
+  wxFileDialog openFileDialog(this, _("Open SYS file"), "", "", "SYS files (*.sys)|*.sys", wxFD_OPEN|wxFD_FILE_MUST_EXIST);
+  if (openFileDialog.ShowModal() == wxID_CANCEL) return;
+  std::string path = std::string(openFileDialog.GetPath().mb_str());
+  std::cout << "Loading file " << path << "\n";
+  std::ifstream input;
+  input.open(path);
+  std::cout << "File status: " << input.is_open() << "\n";
+
+  double M, R, T, angulVel, dayAngle;
+  double x,y, vx,vy, ax,ay;
+  bool heatSource;
+  std::string name;
+  std::string in;
+
+  while (!input.eof()){
+    input >> in;
+    std::cout << in << " ";
+    if (in == "NAME"){
+      input >> name;
+    }else if(in == "MASS"){
+      input >> M;
+    }else if(in == "RADIUS"){
+      input >> R;
+    }else if(in == "TEMP"){
+      input >> T;
+    }else if(in == "ANGLE"){
+      input >> dayAngle;
+    }else if(in == "ANGVEL"){
+      input >> angulVel;
+    }else if(in == "POS"){
+      input >> x >> y;
+    }else if(in == "VEL"){
+      input >> vx >> vy;
+    }else if(in == "ACC"){
+      input >> ax >> ay;
+    }else if(in == "HEATSRC"){
+      input >> heatSource;
+    }else if(in == ")"){
+      starSystem.linkBody( body(M,R,vec2(x,y),vec2(vx,vy),vec2(ax,ay),angulVel,name,T,heatSource,dayAngle) );
+      bodyNames.Add(name);
+    }
+  }
+  delete select_planet;
+  delete select_planet_cm;
+  select_planet = new wxListBox(panel,ID_SelectPlanet,wxPoint(460,140),wxSize(250,100),bodyNames,wxLB_MULTIPLE);
+  select_planet_cm = new wxListBox(panel,ID_SelectPlanetsCM,wxPoint(10,140),wxSize(150,100),bodyNames,wxLB_MULTIPLE);
 }
