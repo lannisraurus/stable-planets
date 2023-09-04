@@ -167,6 +167,7 @@ public:
 };
 
 // Planetary System - This class holds all the information about the planets and is able to create simulations.
+class frame;
 class sys{
 private:
 
@@ -241,81 +242,7 @@ public:
         std::cout << "Created new body: pos(" << pos.X() << " , " << pos.Y() << "), vel(" << vel.X() << " , " << vel.Y() << ")\n";
     }
 
-    void solve(double T, double dT){
-        // clean-up
-        bodies = originalBodies;
-        distanceToBodies.clear();
-        times.clear(); temperature.clear(); orbitalSpeed.clear(); orbitalAccel.clear();
-        xPositions.clear(); yPositions.clear();
-        // SOLVING
-        std::cout << "|| Solving system ...\n";
-        // Allocate Space
-        std::cout << "Allocating space\n";
-        temperature.resize(bodies.size()); orbitalSpeed.resize(bodies.size()); orbitalAccel.resize(bodies.size());
-        xPositions.resize(bodies.size()); yPositions.resize(bodies.size());
-        distanceToBodies = std::vector<std::vector<std::vector<double>>> (bodies.size(), std::vector<std::vector<double>> (bodies.size()) ) ;
-        // Trajectories
-        std::cout << "Calculating trajectories\n";
-        for(double t = 0; t < T; t += dT){
-            std::vector<body> newBodies (bodies.size());
-            std::vector<vec2> accels (bodies.size() , vec2());
-            vec2 vel, pos;
-            for(int i = 0; i < bodies.size(); i++){
-                for(int j = i+1; j < bodies.size(); j++){
-                    vec2 dist = bodies[j].getPosition() - bodies[i].getPosition();
-                    vec2 r = dist.normalized();
-                    double d2 = dist*dist;
-                    vec2 q = (bodies[j].getMass() / d2)*r;
-                    vec2 p = (bodies[i].getMass() / d2)*r;
-                    accels[i] = accels[i] + q;
-                    accels[j] = accels[j] - p;
-
-                }
-                // update vector quantities
-                accels[i] = G*accels[i];
-                vel = bodies[i].getVelocity() + dT*accels[i];
-                pos = bodies[i].getPosition() + dT*vel;
-                // update scalar quantities
-                double temp = 0;
-                if (bodies[i].getIsHeatSource()) temp = bodies[i].getTemperature();
-                else{
-                  for (int k = 0; k < bodies.size(); k++){
-                    if(k!=i){
-                      double Tk4 = pow(bodies[k].getTemperature(),4);
-                      double Rk2 = bodies[k].getRadius()*bodies[k].getRadius();
-                      vec2 D = bodies[i].getPosition()-bodies[k].getPosition();
-                      double D2 = D*D;
-                      temp += Tk4*Rk2/D2;
-                    }
-                  }
-                  temp = pow(temp,0.25);
-                  temp*=ONE_OVER_SQRT_2;
-                }
-                double updatedAngle = dT*bodies[i].getAngularVelocity(); while (updatedAngle>2*PI) updatedAngle-=2*PI; while (updatedAngle < 0) updatedAngle+= 2*PI;
-                // update body
-                newBodies[i] = body(bodies[i].getMass(),bodies[i].getRadius(),pos,vel,accels[i],bodies[i].getAngularVelocity(),bodies[i].getName(),temp,bodies[i].getIsHeatSource(),updatedAngle);
-            }
-            // Trajectory Update
-            bodies = newBodies;
-            // Data Extraction
-            times.push_back(t);
-            for(int i = 0; i < bodies.size(); i++){
-                temperature[i].push_back( bodies[i].getTemperature() );
-                orbitalSpeed[i].push_back(bodies[i].getVelocity().size());
-                for(int j = 0; j < bodies.size(); j++) if(i!=j) distanceToBodies[i][j].push_back( (bodies[i].getPosition()-bodies[j].getPosition()).size() );
-            }
-        }
-        // Data analysis from data extraction
-        std::cout << "Extracting extra data\n";
-        for(int i = 0; i < bodies.size(); i++){
-            orbitalAccel[i].push_back(0);
-            for (int j = 1; j < orbitalSpeed[i].size(); j++){
-                orbitalAccel[i].push_back( (orbitalSpeed[i][j]-orbitalSpeed[i][j-1]) / dT );
-            }
-        }
-        // DONE
-        std::cout << "Done!\n";
-    }
+    void solve(double T, double dT, frame* f);
 
     void saveData(std::string append="", std::string time_units="s", std::string distance_units="m", double time_convert=1., double distance_convert=1.){
         // SAVING
@@ -378,9 +305,6 @@ public:
                 canvas.Clear();
               }
             }
-
-
-
         }
         // DONE
         std::cout << "Done!\n";
@@ -388,20 +312,20 @@ public:
 
 };
 
+///////////////////////////////////// Application class
 
-
-///////////////////////////////////// GUI PROGRAMMING
-
-// Application class
 class app: public wxApp{
 public:
     virtual bool OnInit();
 };
 
+DECLARE_APP(app)
+
 // Frame class
 class frame: public wxFrame{
 public:
     frame(const wxString& title, const wxPoint& pos, const wxSize& size);
+    wxGauge* progress_bar;
 private:
     void OnHello(wxCommandEvent& event);
     void OnExit(wxCommandEvent& event);
@@ -422,8 +346,6 @@ private:
 
     sys starSystem;
     wxArrayString bodyNames;
-
-    wxGauge* progress_bar;
 
     wxTextCtrl* albedo_value;
     wxTextCtrl* temperature_value;
@@ -478,6 +400,95 @@ private:
     wxArrayString massUnits;
 
 };
+
+///////////////////////////////////// SOLVE
+
+void sys::solve(double T, double dT, frame* f){
+    // clean-up
+    bodies = originalBodies;
+    distanceToBodies.clear();
+    times.clear(); temperature.clear(); orbitalSpeed.clear(); orbitalAccel.clear();
+    xPositions.clear(); yPositions.clear();
+    // SOLVING
+    std::cout << "|| Solving system ...\n";
+    // Allocate Space
+    std::cout << "Allocating space\n";
+    temperature.resize(bodies.size()); orbitalSpeed.resize(bodies.size()); orbitalAccel.resize(bodies.size());
+    xPositions.resize(bodies.size()); yPositions.resize(bodies.size());
+    distanceToBodies = std::vector<std::vector<std::vector<double>>> (bodies.size(), std::vector<std::vector<double>> (bodies.size()) ) ;
+    // Trajectories
+    std::cout << "Calculating trajectories\n";
+    for(double t = 0; t < T; t += dT){
+
+
+        wxGetApp().CallAfter(
+          [f,t,T](){
+            f->progress_bar->SetValue(100*(t/T));
+          }
+        );
+
+        std::vector<body> newBodies (bodies.size());
+        std::vector<vec2> accels (bodies.size() , vec2());
+        vec2 vel, pos;
+        for(int i = 0; i < bodies.size(); i++){
+            for(int j = i+1; j < bodies.size(); j++){
+                vec2 dist = bodies[j].getPosition() - bodies[i].getPosition();
+                vec2 r = dist.normalized();
+                double d2 = dist*dist;
+                vec2 q = (bodies[j].getMass() / d2)*r;
+                vec2 p = (bodies[i].getMass() / d2)*r;
+                accels[i] = accels[i] + q;
+                accels[j] = accels[j] - p;
+
+            }
+            // update vector quantities
+            accels[i] = G*accels[i];
+            vel = bodies[i].getVelocity() + dT*accels[i];
+            pos = bodies[i].getPosition() + dT*vel;
+            // update scalar quantities
+            double temp = 0;
+            if (bodies[i].getIsHeatSource()) temp = bodies[i].getTemperature();
+            else{
+              for (int k = 0; k < bodies.size(); k++){
+                if(k!=i){
+                  double Tk4 = pow(bodies[k].getTemperature(),4);
+                  double Rk2 = bodies[k].getRadius()*bodies[k].getRadius();
+                  vec2 D = bodies[i].getPosition()-bodies[k].getPosition();
+                  double D2 = D*D;
+                  temp += Tk4*Rk2/D2;
+                }
+              }
+              temp = pow(temp,0.25);
+              temp*=ONE_OVER_SQRT_2;
+            }
+            double updatedAngle = dT*bodies[i].getAngularVelocity(); while (updatedAngle>2*PI) updatedAngle-=2*PI; while (updatedAngle < 0) updatedAngle+= 2*PI;
+            // update body
+            newBodies[i] = body(bodies[i].getMass(),bodies[i].getRadius(),pos,vel,accels[i],bodies[i].getAngularVelocity(),bodies[i].getName(),temp,bodies[i].getIsHeatSource(),updatedAngle);
+        }
+        // Trajectory Update
+        bodies = newBodies;
+        // Data Extraction
+        times.push_back(t);
+        for(int i = 0; i < bodies.size(); i++){
+            temperature[i].push_back( bodies[i].getTemperature() );
+            orbitalSpeed[i].push_back(bodies[i].getVelocity().size());
+            for(int j = 0; j < bodies.size(); j++) if(i!=j) distanceToBodies[i][j].push_back( (bodies[i].getPosition()-bodies[j].getPosition()).size() );
+        }
+    }
+    // Data analysis from data extraction
+    std::cout << "Extracting extra data\n";
+    for(int i = 0; i < bodies.size(); i++){
+        orbitalAccel[i].push_back(0);
+        for (int j = 1; j < orbitalSpeed[i].size(); j++){
+            orbitalAccel[i].push_back( (orbitalSpeed[i][j]-orbitalSpeed[i][j-1]) / dT );
+        }
+    }
+    // DONE
+    std::cout << "Done!\n";
+}
+
+///////////////////////////////////// GUI PROGRAMMING
+
 
 // EVENT TABLE
 wxBEGIN_EVENT_TABLE(frame, wxFrame)
@@ -661,6 +672,7 @@ void frame::OnHello(wxCommandEvent& event){
 }
 
 void frame::OnRun(wxCommandEvent& event){
+
   // needed variable
   std::stringstream analysis;
   bool valid = true;
@@ -689,7 +701,7 @@ void frame::OnRun(wxCommandEvent& event){
 
   // Validate and RUN simulation
   if (valid){
-    starSystem.solve(T,dT);
+    starSystem.solve(T,dT,this);
     starSystem.saveData();
   }else{
     wxMessageBox( "Something went wrong during the insertion of parameters. Check that the numbers are in a correct format.", "ERROR", wxOK | wxICON_INFORMATION );
@@ -710,6 +722,7 @@ void frame::DeletePlanet(wxCommandEvent& event){
   select_planet = new wxListBox(panel,ID_SelectPlanet,wxPoint(460,140),wxSize(250,100),bodyNames,wxLB_MULTIPLE);
   select_planet_cm = new wxListBox(panel,ID_SelectPlanetsCM,wxPoint(10,140),wxSize(150,100),bodyNames,wxLB_MULTIPLE);
 }
+
 
 void frame::CreatePlanet(wxCommandEvent& event){
 
