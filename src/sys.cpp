@@ -48,7 +48,15 @@ void sys::linkBody(double mass, double radius, double distance, std::vector<std:
     std::cout << "Created new body: pos(" << pos.X() << " , " << pos.Y() << "), vel(" << vel.X() << " , " << vel.Y() << ")\n";
 }
 
+DECLARE_APP(app)
 void sys::solve(double T, double dT, frame* f){
+
+    // events
+    wxCommandEvent prog( wxEVT_COMMAND_TEXT_UPDATED, PROGRESS );
+    wxCommandEvent stat( wxEVT_COMMAND_TEXT_UPDATED, STATUS );
+    int val;
+    std::string msg;
+
     // clean-up
     bodies = originalBodies;
     distanceToBodies.clear();
@@ -65,12 +73,13 @@ void sys::solve(double T, double dT, frame* f){
     std::cout << "Calculating trajectories\n";
     for(double t = 0; t < T; t += dT){
 
-        DECLARE_APP(app)
-        wxGetApp().CallAfter(
-          [f,t,T](){
-            f->progress_bar->SetValue(100*(t/T));
-          }
-        );
+
+        val = round(f->progress_bar->GetRange()*float(t/T));
+        prog.SetInt( val );
+        f->GetEventHandler()->AddPendingEvent(prog);
+        msg = "Calculating Trajectories... ("+std::to_string(val)+" %)";
+        stat.SetString( msg );
+        f->GetEventHandler()->AddPendingEvent(stat);
 
         std::vector<body> newBodies (bodies.size());
         std::vector<vec2> accels (bodies.size() , vec2());
@@ -120,19 +129,52 @@ void sys::solve(double T, double dT, frame* f){
             for(int j = 0; j < bodies.size(); j++) if(i!=j) distanceToBodies[i][j].push_back( (bodies[i].getPosition()-bodies[j].getPosition()).size() );
         }
     }
+
+    val = 0;
+    prog.SetInt( val );
+    f->GetEventHandler()->AddPendingEvent(prog);
+    msg = "Done!";
+    stat.SetString( msg );
+    f->GetEventHandler()->AddPendingEvent(stat);
+
+
     // Data analysis from data extraction
     std::cout << "Extracting extra data\n";
-    for(int i = 0; i < bodies.size(); i++){
+    int BSN = bodies.size();
+    for(int i = 0; i < BSN; i++){
+
+        val = round(f->progress_bar->GetRange()*float(i)/float(BSN));
+        prog.SetInt( val );
+        f->GetEventHandler()->AddPendingEvent(prog);
+        msg = "Extracting additional data... ("+std::to_string(val)+" %)";
+        stat.SetString( msg );
+        f->GetEventHandler()->AddPendingEvent(stat);
+
         orbitalAccel[i].push_back(0);
         for (int j = 1; j < orbitalSpeed[i].size(); j++){
             orbitalAccel[i].push_back( (orbitalSpeed[i][j]-orbitalSpeed[i][j-1]) / dT );
         }
     }
+
+    val = 0;
+    prog.SetInt( val );
+    f->GetEventHandler()->AddPendingEvent(prog);
+    msg = "Done!";
+    stat.SetString( msg );
+    f->GetEventHandler()->AddPendingEvent(stat);
+
     // DONE
     std::cout << "Done!\n";
 }
 
-void sys::saveData(std::string append, std::string time_units, std::string distance_units, double time_convert, double distance_convert){
+void sys::saveData(frame* f, std::string append, std::string time_units, std::string distance_units, double time_convert, double distance_convert){
+
+    // events
+    wxCommandEvent prog( wxEVT_COMMAND_TEXT_UPDATED, PROGRESS );
+    wxCommandEvent stat( wxEVT_COMMAND_TEXT_UPDATED, STATUS );
+    int val;
+    std::string msg;
+
     // SAVING
     std::cout << "|| Saving graph data ...\n";
     // Initialize canvas and grid style
@@ -148,6 +190,14 @@ void sys::saveData(std::string append, std::string time_units, std::string dista
 
     // Create directories and store data
     for(int i = 0; i < bodies.size(); i++){
+
+        float ratio = (float(i)+1)/float(bodies.size());
+        val = f->progress_bar->GetRange()*ratio;
+        prog.SetInt( val );
+        f->GetEventHandler()->AddPendingEvent(prog);
+        msg = "Saving data on "+bodies[i].getName()+" ("+std::to_string(val)+" %)";
+        stat.SetString( msg );
+        f->GetEventHandler()->AddPendingEvent(stat);
 
         std::cout << "Saving " << bodies[i].getName() << "\n";
 
@@ -193,7 +243,16 @@ void sys::saveData(std::string append, std::string time_units, std::string dista
             canvas.Clear();
           }
         }
+
     }
+
+    val = 0;
+    prog.SetInt( val );
+    f->GetEventHandler()->AddPendingEvent(prog);
+    msg = "Done!";
+    stat.SetString( msg );
+    f->GetEventHandler()->AddPendingEvent(stat);
+
     // DONE
     std::cout << "Done!\n";
 }

@@ -34,7 +34,9 @@ enum {
     ID_PeriodUnits = 25,
     ID_IsRotating = 26,
     ID_Save = 27,
-    ID_Load = 28
+    ID_Load = 28,
+    PROGRESS = 29,
+    STATUS = 30
 };
 
 double lengthSI(int i);

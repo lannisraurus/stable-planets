@@ -6,12 +6,5 @@ SRC := $(wildcard src/*.cpp)
 
 C_FLAGS := -Wall -Werror -Wextra -O2 -std=c++20
 
-%:
-	@echo "COMPILING $< --> $@"
-	g++ $< $(SRC) -o $@ $(EIGEN) $(ROOT) $(ROOT_LIBS) -I inc `wx-config --cxxflags --libs`
-
-dump:
-	@echo $(EIGEN)
-	@echo $(ROOT)
-	@echo $(ROOT_LIBS)
-	@echo $(SRC)
+all:
+	g++ $(SRC) -o app $(EIGEN) $(ROOT) $(ROOT_LIBS) -I inc `wx-config --cxxflags --libs`

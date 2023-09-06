@@ -38,6 +38,8 @@ private:
     void EnableDistance(wxCommandEvent& event);
     void Save(wxCommandEvent& event);
     void Load(wxCommandEvent& event);
+    void updateProgress(wxCommandEvent& event);
+    void updateStatus(wxCommandEvent& event);
     wxDECLARE_EVENT_TABLE();
 private:
 

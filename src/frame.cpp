@@ -185,8 +185,17 @@ void frame::OnRun(wxCommandEvent& event){
 
   // Validate and RUN simulation
   if (valid){
-    starSystem.solve(T,dT,this);
-    starSystem.saveData();
+
+    auto run = [T,dT,this](){
+      this->starSystem.solve(T,dT,this);
+      this->starSystem.saveData(this);
+    };
+
+    std::thread indep{run};
+    indep.detach();
+
+
+
   }else{
     wxMessageBox( "Something went wrong during the insertion of parameters. Check that the numbers are in a correct format.", "ERROR", wxOK | wxICON_INFORMATION );
   }
@@ -407,6 +416,14 @@ void frame::Load(wxCommandEvent& event){
   select_planet_cm = new wxListBox(panel,ID_SelectPlanetsCM,wxPoint(10,140),wxSize(150,100),bodyNames,wxLB_MULTIPLE);
 }
 
+void frame::updateProgress(wxCommandEvent& event){
+  progress_bar->SetValue( event.GetInt() );
+}
+
+void frame::updateStatus(wxCommandEvent& event){
+  SetStatusText( event.GetString() );
+}
+
 wxBEGIN_EVENT_TABLE(frame, wxFrame)
   EVT_MENU(ID_Test,    frame::OnHello)
   EVT_MENU(wxID_EXIT,  frame::OnExit)
@@ -420,4 +437,6 @@ wxBEGIN_EVENT_TABLE(frame, wxFrame)
   EVT_CHECKBOX(ID_Atmosphere, frame::EnableAtmosphere)
   EVT_CHECKBOX(ID_IsRotating, frame::EnableRotation)
   EVT_LISTBOX(ID_SelectPlanetsCM, frame::EnableDistance)
+  EVT_COMMAND  (PROGRESS, wxEVT_COMMAND_TEXT_UPDATED, frame::updateProgress)
+  EVT_COMMAND  (STATUS, wxEVT_COMMAND_TEXT_UPDATED, frame::updateStatus)
 wxEND_EVENT_TABLE()

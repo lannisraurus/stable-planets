@@ -48,7 +48,7 @@ public:
       double angularVelocity, std::string name, double temperature, bool heatSource, double orbitalAngle, bool inverted, double dayAngle);
     // data analysis
     void solve(double T, double dT, frame* f);
-    void saveData(std::string append="", std::string time_units="s", std::string distance_units="m", double time_convert=1., double distance_convert=1.);
+    void saveData(frame* f,std::string append="", std::string time_units="s", std::string distance_units="m", double time_convert=1., double distance_convert=1.);
 
 };
 
