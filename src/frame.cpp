@@ -71,15 +71,15 @@ frame::frame(const wxString& title, const wxPoint& pos, const wxSize& size) : wx
     distance_value->Enable(false);
     distance_units->Select(3);
     // Temperature
-    select_temperature = new wxStaticText(panel,wxID_ANY,"Temperature [K]: ",wxPoint(10,340));
-    temperature_value = new wxTextCtrl(panel,ID_Temperature,"",wxPoint(120,340),wxSize(40,20));
+    select_temperature = new wxStaticText(panel,wxID_ANY,"Temperature [K]: ",wxPoint(10,292));
+    temperature_value = new wxTextCtrl(panel,ID_Temperature,"",wxPoint(120,292),wxSize(40,20));
     select_heat_source = new wxCheckBox(panel,ID_HeatSource,"Heat Source",wxPoint(10,270));
     temperature_value->Enable(false);
     // Albedo
-    select_albedo = new wxStaticText(panel,wxID_ANY,"Albedo [unitless]: ",wxPoint(10,360));
-    albedo_value = new wxTextCtrl(panel,ID_Albedo,"",wxPoint(120,360),wxSize(40,20));
-    select_atmosphere = new wxCheckBox(panel,ID_Atmosphere,"Atmosphere [WIP]",wxPoint(10,290));
-    albedo_value->Enable(false);
+    // select_albedo = new wxStaticText(panel,wxID_ANY,"Albedo [unitless]: ",wxPoint(10,360));
+    // albedo_value = new wxTextCtrl(panel,ID_Albedo,"",wxPoint(120,360),wxSize(40,20));
+    // select_atmosphere = new wxCheckBox(panel,ID_Atmosphere,"Atmosphere [WIP]",wxPoint(10,290));
+    // albedo_value->Enable(false);
     // Mass
     select_mass = new wxStaticText(panel,wxID_ANY,"Mass: ",wxPoint(170,190));
     mass_value = new wxTextCtrl(panel,ID_Mass,"",wxPoint(240,180),wxSize(100,35));
